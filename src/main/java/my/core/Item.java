@@ -1,15 +1,27 @@
 package my.core;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.Getter;
+
+import java.io.Serializable;
+
 /**
  * @author xuzefan  2019/5/4 17:55
  */
+@Data
+@AllArgsConstructor
+public class Item implements Serializable {
 
-public class Item {
+    private long crc32;
 
-    private int activeName;
+    private long ts;
 
-    private int start;
+    private int key_size;
 
-    private int length;
+    private int value_size;
 
+    private String key;
+
+    private String value;
 }
