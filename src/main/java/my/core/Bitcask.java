@@ -3,6 +3,7 @@ package my.core;
 import my.utils.CrcUtil;
 import my.utils.FileUtils;
 import my.utils.SerializationUtil;
+import my.utils.StringUtils;
 
 
 import java.io.File;
@@ -10,6 +11,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Array;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,9 @@ import java.util.stream.Collectors;
  */
 public class Bitcask {
 
+    // 8 + 8 + 4 + 4
+    private static int HEADER_SIZE = 24;
+
     private Map<String, Index> TABLE = new ConcurrentHashMap<>();
 
     private final int THRESHOLD = 10000;
@@ -29,9 +36,9 @@ public class Bitcask {
 
     private int currentActive = 0;
 
-    private RandomAccessFile readAccessFile;
+    private FileChannel writeChannel;
 
-    private RandomAccessFile writeAccessFile;
+    private FileChannel readChannel;
 
     public Bitcask(){
         initData();
@@ -65,22 +72,22 @@ public class Bitcask {
             if (!file.exists()) {
                 file.createNewFile();
             }
-            this.readAccessFile = new RandomAccessFile(file,"r");
-            this.writeAccessFile = new RandomAccessFile(file,"rw");
+            this.readChannel = new RandomAccessFile(file,"r").getChannel();
+            this.writeChannel = new RandomAccessFile(file,"rw").getChannel();
         }catch (Exception e){
             e.printStackTrace();
         }
 
     }
 
-    private RandomAccessFile getReadAccessFile(Index info){
+    private FileChannel getReadAccessFile(Index info){
         String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
         if (info.getActiveFileName().equals(activeFileName)) {
-            return this.readAccessFile;
+            return this.readChannel;
         } else {
             File file = new File(activeFileName);
             try {
-                return  new RandomAccessFile(file,"r");
+                return  new RandomAccessFile(file,"r").getChannel();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
@@ -88,35 +95,34 @@ public class Bitcask {
         return null;
     }
 
-    private RandomAccessFile getWriteAccessFile(){
+    private FileChannel getWriteAccessFile(){
         try {
-            if ( this.writeAccessFile.length() > THRESHOLD){
+            if ( this.writeChannel.size() > THRESHOLD){
                 currentActive += 1;
                 String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
                 File file = new File(activeFileName);
                 if (!file.exists()) {
                     file.createNewFile();
                 }
-                this.writeAccessFile = new RandomAccessFile(file,"rw");
+                this.writeChannel = new RandomAccessFile(file,"rw").getChannel();
             }
-            return this.writeAccessFile;
+            return this.writeChannel;
         } catch (IOException e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    private Index ioWrite(long crc32, long ts, int key_size, int value_size, String key, String value) {
+    private Index ioWrite(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) {
 
         try {
-            RandomAccessFile randomAccessFile = this.getWriteAccessFile();
-            Item item = getItem(crc32,ts,key_size,value_size,key,value);
-            byte[] byteArray = SerializationUtil.serialize(item);
-            randomAccessFile.seek(randomAccessFile.length());
-            long start = randomAccessFile.getFilePointer();
-            long length = byteArray.length;
-            randomAccessFile.write(byteArray);
-            String activeFileName = basePath + String.format("%s.sst",currentActive);
+            FileChannel fileChannel = this.getWriteAccessFile();
+            fileChannel.position(fileChannel.size());
+            long start = fileChannel.position();
+            long length = HEADER_SIZE + key_size + value_size;
+            ByteBuffer[] byteBuffers = getByteBuffer(crc32,ts,key_size,value_size,keyArray,valueArray);
+            writeFully(fileChannel,byteBuffers);
+            String activeFileName = basePath + "/"+ String.format("%s.sst",currentActive);
             return new Index(activeFileName,start,length);
         } catch (IOException e) {
             e.printStackTrace();
@@ -124,21 +130,78 @@ public class Bitcask {
         return null;
     }
 
-    private Item getItem(long crc32, long ts, int key_size, int value_size, String key, String value){
+    private long writeFully(FileChannel ch, ByteBuffer[] vec) throws IOException {
+        synchronized (ch) {
+            long len = length(vec);
+            long w = 0;
+            while (w < len) {
+                long ww = ch.write(vec);
+                if (ww > 0) {
+                    w += ww;
+                } else if (ww == 0) {
+                    Thread.yield();
+                } else {
+                    return w;
+                }
+            }
+            return w;
+        }
+
+    }
+
+    private long length(ByteBuffer[] vec) {
+        long length = 0;
+        for (int i = 0; i < vec.length; i++) {
+            length += vec[i].remaining();
+        }
+        return length;
+    }
+
+
+    private Item getItem(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray){
+        String key = new String(keyArray,Charset.forName("utf-8"));
+        String value = new String(valueArray,Charset.forName("utf-8"));
         return new Item(crc32,ts,key_size,value_size,key,value);
     }
 
-    private byte[] ioRead(Index info) {
-        RandomAccessFile randomAccessFile = this.getReadAccessFile(info);
+    private Item ioRead(Index info) {
+        FileChannel fileChannel = this.getReadAccessFile(info);
         try {
             byte[] byteArray = new byte[(int)info.getLength()];
-            randomAccessFile.seek(info.getStart());
-            randomAccessFile.read(byteArray,0,(int)info.getLength());
-            return Arrays.copyOf(byteArray,(int)info.getLength());
+            ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray);
+            fileChannel.position(info.getStart());
+            fileChannel.read(byteBuffer);
+            return byteBufferToItem(byteBuffer);
         } catch (IOException e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+
+    private Item byteBufferToItem(ByteBuffer byteBuffer) {
+        byteBuffer.rewind();
+        long crc32 = byteBuffer.getLong();
+        long ts = byteBuffer.getLong();
+        int key_size = byteBuffer.getInt();
+        int value_size = byteBuffer.getInt();
+        byte[] keyArray = new byte[key_size];
+        byte[] valueArray = new byte[value_size];
+        byteBuffer.get(keyArray);
+        byteBuffer.get(valueArray);
+        return getItem(crc32,ts,key_size,value_size,keyArray,valueArray);
+    }
+
+    private ByteBuffer[] getByteBuffer(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray){
+        byte[] data = new byte[HEADER_SIZE];
+        ByteBuffer h = ByteBuffer.wrap(data);
+        h.putLong(0 ,crc32);
+        h.putLong(8,ts);
+        h.putInt(16,key_size);
+        h.putInt(20,value_size);
+        ByteBuffer key = ByteBuffer.wrap(keyArray);
+        ByteBuffer value = ByteBuffer.wrap(valueArray);
+        return new ByteBuffer[]{h,key,value};
     }
 
     public String get(String key) throws Exception {
@@ -146,18 +209,19 @@ public class Bitcask {
         if (info == null){
             throw new Exception("not found.");
         }
-        byte[] pickled_data = ioRead(info);
-        Item item = (Item) SerializationUtil.deserialize(pickled_data);
+        Item item = ioRead(info);
         return item.getValue();
     }
 
     public void put(String key,String value){
-        int key_size = key.length();
-        int value_size = value.length();
+        byte[] keyArray = StringUtils.getStringByte(key);
+        byte[] valueArray = StringUtils.getStringByte(value);
+        int key_size = keyArray.length;
+        int value_size = valueArray.length;
         long ts = System.currentTimeMillis();
         String crcStr = String.format("%d%d%d%s%s",ts , key_size , value_size , key ,value);
         long crc32 = CrcUtil.getCrc32(crcStr);
-        Index info = ioWrite(crc32, ts, key_size, value_size, key, value);
+        Index info = ioWrite(crc32, ts, key_size, value_size, keyArray, valueArray);
         this.TABLE.put(key,info);
     }
 
