@@ -6,6 +6,7 @@ import my.utils.SerializationUtil;
 
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Array;
@@ -72,8 +73,19 @@ public class Bitcask {
 
     }
 
-    private RandomAccessFile getReadAccessFile(){
-        return this.readAccessFile;
+    private RandomAccessFile getReadAccessFile(Index info){
+        String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
+        if (info.getActiveFileName().equals(activeFileName)) {
+            return this.readAccessFile;
+        } else {
+            File file = new File(activeFileName);
+            try {
+                return  new RandomAccessFile(file,"r");
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+        return null;
     }
 
     private RandomAccessFile getWriteAccessFile(){
@@ -85,7 +97,7 @@ public class Bitcask {
                 if (!file.exists()) {
                     file.createNewFile();
                 }
-                this.writeAccessFile = new RandomAccessFile(file,"ab+");
+                this.writeAccessFile = new RandomAccessFile(file,"rw");
             }
             return this.writeAccessFile;
         } catch (IOException e) {
@@ -117,7 +129,7 @@ public class Bitcask {
     }
 
     private byte[] ioRead(Index info) {
-        RandomAccessFile randomAccessFile = this.getReadAccessFile();
+        RandomAccessFile randomAccessFile = this.getReadAccessFile(info);
         try {
             byte[] byteArray = new byte[(int)info.getLength()];
             randomAccessFile.seek(info.getStart());

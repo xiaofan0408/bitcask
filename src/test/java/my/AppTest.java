@@ -25,5 +25,15 @@ public class AppTest
         Bitcask bitcask = new Bitcask();
         bitcask.put("hello","hello world");
         Assert.assertEquals(bitcask.get("hello"),"hello world");
+        bitcask.put("hello","hello2");
+        bitcask.put("hello1","hello11");
+        Assert.assertEquals(bitcask.get("hello"),"hello2");
+        Assert.assertEquals(bitcask.get("hello1"),"hello11");
+        for (int i =0; i < 100;i++){
+            String key = "key"+i;
+            String value = "value"+i;
+            bitcask.put(key,value);
+            Assert.assertEquals(bitcask.get(key),value);
+        }
     }
 }
