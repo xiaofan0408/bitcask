@@ -54,7 +54,7 @@ public class Bitcask {
         try {
             List<File> files = FileUtils.listFile(basePath);
             files.forEach( file -> {
-
+    
             });
         } catch (Exception e) {
             e.printStackTrace();
