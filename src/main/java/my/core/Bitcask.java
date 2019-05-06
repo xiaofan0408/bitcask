@@ -126,7 +126,7 @@ public class Bitcask {
         if (info.getActiveFileName().equals(activeFileName)) {
             return this.readChannel;
         } else {
-            File file = new File(activeFileName);
+            File file = new File(info.getActiveFileName());
             try {
                 return  new RandomAccessFile(file,"r").getChannel();
             } catch (FileNotFoundException e) {
@@ -146,6 +146,7 @@ public class Bitcask {
                     file.createNewFile();
                 }
                 this.writeChannel = new RandomAccessFile(file,"rw").getChannel();
+                this.readChannel = new RandomAccessFile(file,"r").getChannel();
             }
             return this.writeChannel;
         } catch (IOException e) {
@@ -187,7 +188,6 @@ public class Bitcask {
             }
             return w;
         }
-
     }
 
     private long length(ByteBuffer[] vec) {
