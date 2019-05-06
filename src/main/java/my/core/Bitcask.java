@@ -47,19 +47,37 @@ public class Bitcask {
     private void initData(){
         initCurrentActive();
         initAccessFile();
-        loadData();
+//        loadData();
     }
 
     private void loadData() {
         try {
             List<File> files = FileUtils.listFile(basePath);
             files.forEach( file -> {
-    
+                try {
+                    RandomAccessFile randomAccessFile = new RandomAccessFile(file,"r");
+                    long start = randomAccessFile.getFilePointer();
+                    byte[] bytes = new byte[HEADER_SIZE];
+                    randomAccessFile.read(bytes);
+                    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+                    byteBuffer.rewind();
+                    long crc32 = byteBuffer.getLong();
+                    long ts = byteBuffer.getLong();
+                    int key_size = byteBuffer.getInt();
+                    int value_size = byteBuffer.getInt();
+                    byte[] keyArray = new byte[key_size];
+                    randomAccessFile.read(keyArray);
+                    String key = new String(keyArray,Charset.forName("utf-8"));
+                    this.TABLE.put(key,new Index(file.getPath(),start, HEADER_SIZE + key_size + value_size));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             });
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
 
     private void initCurrentActive(){
         try {

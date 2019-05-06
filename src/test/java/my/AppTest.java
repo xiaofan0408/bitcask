@@ -36,4 +36,11 @@ public class AppTest
             Assert.assertEquals(bitcask.get(key),value);
         }
     }
+
+
+    @Test
+    public void testStart() throws Exception {
+        Bitcask bitcask = new Bitcask();
+        bitcask.get("hello");
+    }
 }
