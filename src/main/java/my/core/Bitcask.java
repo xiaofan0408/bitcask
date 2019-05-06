@@ -23,7 +23,7 @@ public class Bitcask {
 
     private Map<String, Index> TABLE = new ConcurrentHashMap<>();
 
-    private final int THRESHOLD = 10000;
+    private final int THRESHOLD = 1024 * 1024;
 
     private final String basePath = "./data";
 
@@ -40,6 +40,18 @@ public class Bitcask {
     private void initData(){
         initCurrentActive();
         initAccessFile();
+        loadData();
+    }
+
+    private void loadData() {
+        try {
+            List<File> files = FileUtils.listFile(basePath);
+            files.forEach( file -> {
+
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void initCurrentActive(){

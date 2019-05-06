@@ -30,6 +30,27 @@ public class FileUtils {
       return fileName;
   }
 
+    public static List<File> listFile(String path) throws Exception{
+        List<File> fileList = new ArrayList<>();
+        File file = new File(path);
+        if(!file.exists()) {
+            file.mkdir();
+        }
+        File[] array = file.listFiles();
+        if (array == null) {
+            return new ArrayList<>();
+        }
+        for(int i=0;i<array.length;i++) {
+            if (array[i].isFile()) {
+                fileList.add(array[i]);
+            } else if (array[i].isDirectory()){
+                List<File> childrenFileNames = listFile(array[i].getPath());
+                fileList.addAll(childrenFileNames);
+            }
+        }
+        return fileList;
+    }
+
 }
 
 
