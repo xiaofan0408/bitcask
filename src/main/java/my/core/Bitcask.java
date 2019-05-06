@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -47,7 +48,7 @@ public class Bitcask {
     private void initData(){
         initCurrentActive();
         initAccessFile();
-//        loadData();
+        loadData();
     }
 
     private void loadData() {
@@ -55,20 +56,11 @@ public class Bitcask {
             List<File> files = FileUtils.listFile(basePath);
             files.forEach( file -> {
                 try {
-                    RandomAccessFile randomAccessFile = new RandomAccessFile(file,"r");
-                    long start = randomAccessFile.getFilePointer();
-                    byte[] bytes = new byte[HEADER_SIZE];
-                    randomAccessFile.read(bytes);
-                    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-                    byteBuffer.rewind();
-                    long crc32 = byteBuffer.getLong();
-                    long ts = byteBuffer.getLong();
-                    int key_size = byteBuffer.getInt();
-                    int value_size = byteBuffer.getInt();
-                    byte[] keyArray = new byte[key_size];
-                    randomAccessFile.read(keyArray);
-                    String key = new String(keyArray,Charset.forName("utf-8"));
-                    this.TABLE.put(key,new Index(file.getPath(),start, HEADER_SIZE + key_size + value_size));
+                    FileChannel channel = new RandomAccessFile(file,"r").getChannel();
+                    while (channel.size() != channel.position()) {
+                        readOneIndex(channel,file.getPath());
+                    }
+                    channel.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -76,6 +68,25 @@ public class Bitcask {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void readOneIndex(FileChannel channel,String path) throws IOException {
+        long start = channel.position();
+        byte[] bytes = new byte[HEADER_SIZE];
+        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+        channel.read(byteBuffer);
+        byteBuffer.rewind();
+        long crc32 = byteBuffer.getLong();
+        long ts = byteBuffer.getLong();
+        int key_size = byteBuffer.getInt();
+        int value_size = byteBuffer.getInt();
+        byte[] keyArray = new byte[key_size];
+        ByteBuffer k = ByteBuffer.wrap(keyArray);
+        channel.read(k);
+        String key = new String(keyArray,Charset.forName("utf-8"));
+        this.TABLE.put(key,new Index(path ,start, HEADER_SIZE + key_size + value_size));
+        long end = start + HEADER_SIZE + key_size + value_size;
+        channel.position(end);
     }
 
 

@@ -41,6 +41,10 @@ public class AppTest
     @Test
     public void testStart() throws Exception {
         Bitcask bitcask = new Bitcask();
-        bitcask.get("hello");
+        for (int i =0; i < 100;i++){
+            String key = "key"+i;
+            String value = "value"+i;
+            Assert.assertEquals(bitcask.get(key),value);
+        }
     }
 }
