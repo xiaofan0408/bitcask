@@ -23,12 +23,12 @@ public class AppTest
     @Test
     public void testGetAndPut() throws Exception {
         Bitcask bitcask = new Bitcask();
-        bitcask.put("hello","hello world");
-        Assert.assertEquals(bitcask.get("hello"),"hello world");
-        bitcask.put("hello","hello2");
-        bitcask.put("hello1","hello11");
-        Assert.assertEquals(bitcask.get("hello"),"hello2");
-        Assert.assertEquals(bitcask.get("hello1"),"hello11");
+//        bitcask.put("hello","hello world");
+//        Assert.assertEquals(bitcask.get("hello"),"hello world");
+//        bitcask.put("hello","hello2");
+//        bitcask.put("hello1","hello11");
+//        Assert.assertEquals(bitcask.get("hello"),"hello2");
+//        Assert.assertEquals(bitcask.get("hello1"),"hello11");
         for (int i =0; i < 30000;i++){
             String key = "key"+i;
             String value = "value"+i;
@@ -41,7 +41,7 @@ public class AppTest
     @Test
     public void testStart() throws Exception {
         Bitcask bitcask = new Bitcask();
-        for (int i =0; i < 3000;i++){
+        for (int i =0; i < 30000;i++){
             String key = "key"+i;
             String value = "value"+i;
             Assert.assertEquals(bitcask.get(key),value);

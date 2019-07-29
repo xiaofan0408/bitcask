@@ -10,7 +10,11 @@ public class App
 {
     public static void main( String[] args ) throws Exception {
         Bitcask bitcask = new Bitcask();
-//        bitcask.put("hello","hello world");
-        System.out.println(bitcask.get("hello"));
+        long start = System.currentTimeMillis();
+        for (int i =0; i < 30000;i++){
+            String key = "key"+i;
+            bitcask.get(key);
+        }
+        System.out.println(System.currentTimeMillis() - start);
     }
 }
