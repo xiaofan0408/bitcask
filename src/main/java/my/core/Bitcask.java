@@ -3,6 +3,7 @@ package my.core;
 import my.entity.Item;
 import my.storage.KeyDir;
 import my.storage.Storage;
+import my.utils.StringUtils;
 
 
 /**
@@ -24,8 +25,12 @@ public class Bitcask {
         return item.getValue();
     }
 
+    public void put(String key,byte[] values){
+        keyDir.put(key,values);
+    }
+
     public void put(String key,String value){
-       keyDir.put(key,value);
+      put(key,StringUtils.getStringByte(value));
     }
 
 }

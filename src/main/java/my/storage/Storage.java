@@ -2,6 +2,7 @@ package my.storage;
 
 import my.entity.Index;
 import my.entity.Item;
+import my.utils.Crc32;
 import my.utils.FileUtils;
 
 import java.io.File;
@@ -21,10 +22,10 @@ import java.util.stream.Collectors;
  */
 public class Storage {
 
-    // 8 + 8 + 4 + 4
-    private static int HEADER_SIZE = 24;
+    // 4 + 8 + 4 + 4
+    public static int HEADER_SIZE = 20;
 
-    private final int THRESHOLD = 1024 * 1024;
+    private final int THRESHOLD = 1024 * 1024 * 1024;
 
     private final String basePath = "./data";
 
@@ -147,14 +148,14 @@ public class Storage {
         return null;
     }
 
-    public Index ioWrite(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) {
+    public Index ioWrite(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) {
 
         try {
             FileChannel fileChannel = this.getWriteAccessFile();
             fileChannel.position(fileChannel.size());
             long start = fileChannel.position();
             long length = HEADER_SIZE + key_size + value_size;
-            ByteBuffer[] byteBuffers = getByteBuffer(crc32,ts,key_size,value_size,keyArray,valueArray);
+            ByteBuffer[] byteBuffers = getByteBuffer(ts,key_size,value_size,keyArray,valueArray);
             writeFully(fileChannel,byteBuffers);
             String activeFileName = basePath + "/"+ String.format("%s.sst",currentActive);
             return new Index(activeFileName,start,length);
@@ -209,15 +210,20 @@ public class Storage {
         return getItem(crc32,ts,key_size,value_size,keyArray,valueArray);
     }
 
-    private ByteBuffer[] getByteBuffer(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray){
+    private ByteBuffer[] getByteBuffer(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray){
         byte[] data = new byte[HEADER_SIZE];
         ByteBuffer h = ByteBuffer.wrap(data);
-        h.putLong(0 ,crc32);
-        h.putLong(8,ts);
-        h.putInt(16,key_size);
-        h.putInt(20,value_size);
+        h.putLong(4,ts);
+        h.putInt(12,key_size);
+        h.putInt(16,value_size);
         ByteBuffer key = ByteBuffer.wrap(keyArray);
         ByteBuffer value = ByteBuffer.wrap(valueArray);
+        Crc32 crc = new Crc32();
+        crc.update(data, 4, 16);
+        crc.update(key);
+        crc.update(value);
+        int crc32 = crc.getValue();
+        h.putInt(0,crc32);
         return new ByteBuffer[]{h,key,value};
     }
 
@@ -227,7 +233,7 @@ public class Storage {
         ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
         channel.read(byteBuffer);
         byteBuffer.rewind();
-        long crc32 = byteBuffer.getLong();
+        long crc32 = byteBuffer.getInt();
         long ts = byteBuffer.getLong();
         int key_size = byteBuffer.getInt();
         int value_size = byteBuffer.getInt();

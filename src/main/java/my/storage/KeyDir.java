@@ -5,6 +5,7 @@ import my.entity.Item;
 import my.utils.CrcUtil;
 import my.utils.StringUtils;
 
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,15 +32,13 @@ public class KeyDir {
         return item;
     }
 
-    public void put(String key,String value){
+    public void put(String key,byte[] values){
         byte[] keyArray = StringUtils.getStringByte(key);
-        byte[] valueArray = StringUtils.getStringByte(value);
+        byte[] valueArray = values;
         int key_size = keyArray.length;
         int value_size = valueArray.length;
         long ts = System.currentTimeMillis();
-        String crcStr = String.format("%d%d%d%s%s",ts , key_size , value_size , key ,value);
-        long crc32 = CrcUtil.getCrc32(crcStr);
-        Index info = storage.ioWrite(crc32, ts, key_size, value_size, keyArray, valueArray);
+        Index info = storage.ioWrite(ts, key_size, value_size, keyArray, valueArray);
         this.TABLE.put(key,info);
     }
 
