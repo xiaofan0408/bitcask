@@ -37,6 +37,24 @@ public class AppTest
         }
     }
 
+    @Test
+    public void testPut() throws Exception {
+        Bitcask bitcask = new Bitcask();
+//        bitcask.put("hello","hello world");
+//        Assert.assertEquals(bitcask.get("hello"),"hello world");
+//        bitcask.put("hello","hello2");
+//        bitcask.put("hello1","hello11");
+//        Assert.assertEquals(bitcask.get("hello"),"hello2");
+//        Assert.assertEquals(bitcask.get("hello1"),"hello11");
+        byte[] array128 = new byte[1024];
+        String key = "key";
+        long start = System.currentTimeMillis();
+        for (int i =0; i < 100000;i++){
+            bitcask.put(key,array128);
+        }
+        System.out.println(System.currentTimeMillis() - start);
+    }
+
 
     @Test
     public void testStart() throws Exception {
