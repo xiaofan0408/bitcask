@@ -15,9 +15,11 @@ public class BitcaskBenchmark {
 
     private Bitcask bitcask;
 
-    private byte[] array1024 = new byte[128];
+    private byte[] array1024 = new byte[1024 * 10];
 
     private  String key = "key";
+
+    private  String value = "value";
 
     @Setup
     public void init(){
@@ -26,7 +28,7 @@ public class BitcaskBenchmark {
 
     @Benchmark
     public void testSet10kb(){
-        bitcask.put(key,array1024);
+        bitcask.put(key,value);
     }
 
     public static void main(String[] args) throws RunnerException {
@@ -39,7 +41,7 @@ public class BitcaskBenchmark {
                 .measurementIterations(2)
                 .mode(Mode.Throughput)
                 .forks(1)
-                .output("./log/bitcask3.log")
+                .output("./log/bitcask1-string.log")
                 .build();
 
         new Runner(opt).run();

@@ -2,6 +2,7 @@ package my.storage;
 
 import my.entity.Index;
 import my.entity.Item;
+import my.utils.ByteUtils;
 import my.utils.Crc32;
 import my.utils.FileUtils;
 
@@ -22,8 +23,8 @@ import java.util.stream.Collectors;
  */
 public class Storage {
 
-    // 4 + 8 + 4 + 4
-    public static int HEADER_SIZE = 20;
+    // 8 + 8 + 4 + 4
+    public static int HEADER_SIZE = 24;
 
     private final int THRESHOLD = 1024 * 1024 * 1024;
 
@@ -155,8 +156,8 @@ public class Storage {
             fileChannel.position(fileChannel.size());
             long start = fileChannel.position();
             long length = HEADER_SIZE + key_size + value_size;
-            ByteBuffer[] byteBuffers = getByteBuffer(ts,key_size,value_size,keyArray,valueArray);
-            writeFully(fileChannel,byteBuffers);
+            ByteBuffer byteBuffer = getByteBuffer(ts,key_size,value_size,keyArray,valueArray);
+            writeFully(fileChannel,byteBuffer);
             String activeFileName = basePath + "/"+ String.format("%s.sst",currentActive);
             return new Index(activeFileName,start,length);
         } catch (IOException e) {
@@ -165,22 +166,8 @@ public class Storage {
         return null;
     }
 
-    private long writeFully(FileChannel ch, ByteBuffer[] vec) throws IOException {
-        synchronized (ch) {
-            long len = length(vec);
-            long w = 0;
-            while (w < len) {
-                long ww = ch.write(vec);
-                if (ww > 0) {
-                    w += ww;
-                } else if (ww == 0) {
-                    Thread.yield();
-                } else {
-                    return w;
-                }
-            }
-            return w;
-        }
+    private long writeFully(FileChannel ch, ByteBuffer vec) throws IOException {
+        return ch.write(vec);
     }
 
     public Item ioRead(Index info) {
@@ -210,21 +197,20 @@ public class Storage {
         return getItem(crc32,ts,key_size,value_size,keyArray,valueArray);
     }
 
-    private ByteBuffer[] getByteBuffer(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray){
+    private ByteBuffer getByteBuffer(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) throws IOException {
         byte[] data = new byte[HEADER_SIZE];
         ByteBuffer h = ByteBuffer.wrap(data);
-        h.putLong(4,ts);
-        h.putInt(12,key_size);
-        h.putInt(16,value_size);
-        ByteBuffer key = ByteBuffer.wrap(keyArray);
-        ByteBuffer value = ByteBuffer.wrap(valueArray);
+        h.putLong(8,ts);
+        h.putInt(16,key_size);
+        h.putInt(20,value_size);
         Crc32 crc = new Crc32();
-        crc.update(data, 4, 16);
-        crc.update(key);
-        crc.update(value);
-        int crc32 = crc.getValue();
-        h.putInt(0,crc32);
-        return new ByteBuffer[]{h,key,value};
+        crc.update(data, 8, 16);
+        crc.update(keyArray);
+        crc.update(valueArray);
+        long crc32 = crc.getValue();
+        h.putLong(0,crc32);
+        byte[] result = ByteUtils.concat(data,keyArray,valueArray);
+        return ByteBuffer.wrap(result);
     }
 
     private void readOneIndex(FileChannel channel,String path,KeyDir keyDir) throws IOException {
@@ -233,7 +219,7 @@ public class Storage {
         ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
         channel.read(byteBuffer);
         byteBuffer.rewind();
-        long crc32 = byteBuffer.getInt();
+        long crc32 = byteBuffer.getLong();
         long ts = byteBuffer.getLong();
         int key_size = byteBuffer.getInt();
         int value_size = byteBuffer.getInt();
@@ -252,6 +238,11 @@ public class Storage {
         return new Item(crc32,ts,key_size,value_size,key,value);
     }
 
-
+    public static byte[] copyOf(byte[] original, int newLength) {
+        byte[] copy = new byte[newLength];
+        System.arraycopy(original, 0, copy, 0,
+                Math.min(original.length, newLength));
+        return copy;
+    }
 
 }
