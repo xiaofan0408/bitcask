@@ -17,7 +17,7 @@ public class BitcaskBenchmark {
 
     private Bitcask bitcask;
 
-    private byte[] array1024 = new byte[1024];
+    private byte[] array1024 = new byte[128];
 
     private  String key = "key";
 
@@ -45,7 +45,7 @@ public class BitcaskBenchmark {
                 .measurementIterations(2)
                 .mode(Mode.Throughput)
                 .forks(1)
-                .output("./log/bitcask3-1kb.log")
+                .output("./log/bitcask3-128.log")
                 .build();
 
         new Runner(opt).run();

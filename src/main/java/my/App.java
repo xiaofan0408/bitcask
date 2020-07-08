@@ -2,6 +2,7 @@ package my;
 
 import my.core.Bitcask;
 import my.storage.impl.AsyncFlushStorage;
+import my.storage.impl.FileChannelStorage;
 import my.storage.impl.MmapStorage;
 
 /**
@@ -11,14 +12,15 @@ import my.storage.impl.MmapStorage;
 public class App 
 {
     public static void main( String[] args ) throws Exception {
-        Bitcask bitcask = Bitcask.builder().storage(new MmapStorage()).build();
+        Bitcask bitcask = Bitcask.builder().storage(new FileChannelStorage()).build();
 //        long start = System.currentTimeMillis();
 //        for (int i =0; i < 30000;i++){
 //            String key = "key"+i;
 //            bitcask.get(key);
 //        }
 //        System.out.println(System.currentTimeMillis() - start);
-        bitcask.put("key1","value1");
-        System.out.println(bitcask.get("key1"));
+//        bitcask.put("key1","value1");
+//        System.out.println(bitcask.get("key1"));
+        System.out.println(bitcask.get("key"));
     }
 }

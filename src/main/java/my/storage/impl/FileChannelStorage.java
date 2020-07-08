@@ -18,6 +18,7 @@ import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -32,13 +33,15 @@ public class FileChannelStorage implements Storage {
 
     private final String basePath = "./data";
 
-    private int currentActive = 0;
+    private AtomicLong currentActive = new AtomicLong(0);
 
     private FileChannel writeChannel;
 
     private FileChannel readChannel;
 
     private Map<String,FileChannel> readChannelMap = new ConcurrentHashMap<>();
+
+    private AtomicLong writePosition;
 
     public FileChannelStorage() {
         initCurrentActive();
@@ -75,9 +78,10 @@ public class FileChannelStorage implements Storage {
 
         try {
             FileChannel fileChannel = this.getWriteAccessFile();
-            fileChannel.position(fileChannel.size());
-            long start = fileChannel.position();
+            fileChannel.position(writePosition.get());
+            long start = writePosition.get();
             long length = HEADER_SIZE + key_size + value_size;
+            writePosition.addAndGet(length);
             ByteBuffer byteBuffer = getByteBuffer(ts,key_size,value_size,keyArray,valueArray);
             writeFully(fileChannel,byteBuffer);
             String activeFileName = basePath + "/"+ String.format("%s.sst",currentActive);
@@ -107,12 +111,12 @@ public class FileChannelStorage implements Storage {
         try {
             List<String> fileNameList = FileUtils.getFile(basePath);
             if (fileNameList.size() == 0) {
-                currentActive = 1;
+                currentActive.set(1);
             } else {
                 List<Integer> nameInteger = fileNameList.parallelStream().map( file -> {
                     return Integer.valueOf(file.replace(".sst",""));
                 }).collect(Collectors.toList());
-                currentActive = nameInteger.parallelStream().max(Integer::compare).get();
+                currentActive.set(nameInteger.parallelStream().max(Integer::compare).get());
             }
         } catch (Exception e){
             e.printStackTrace();
@@ -128,6 +132,7 @@ public class FileChannelStorage implements Storage {
             }
             this.readChannel = new RandomAccessFile(file,"r").getChannel();
             this.writeChannel = new RandomAccessFile(file,"rw").getChannel();
+            this.writePosition = new AtomicLong(writeChannel.position());
             this.readChannelMap.put(activeFileName,readChannel);
             FileUtils.listFile(basePath).stream().forEach(f ->{
                 try {
@@ -159,8 +164,8 @@ public class FileChannelStorage implements Storage {
 
     private FileChannel getWriteAccessFile(){
         try {
-            if ( this.writeChannel.size() > THRESHOLD){
-                currentActive += 1;
+            if ( this.writePosition.get()> THRESHOLD){
+                currentActive.incrementAndGet();
                 String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
                 File file = new File(activeFileName);
                 if (!file.exists()) {
@@ -168,6 +173,7 @@ public class FileChannelStorage implements Storage {
                 }
                 this.writeChannel = new RandomAccessFile(file,"rw").getChannel();
                 this.readChannel = new RandomAccessFile(file,"r").getChannel();
+                this.writePosition.set(0);
             }
             return this.writeChannel;
         } catch (IOException e) {

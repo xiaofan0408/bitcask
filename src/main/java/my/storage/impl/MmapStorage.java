@@ -19,6 +19,7 @@ import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -34,13 +35,15 @@ public class MmapStorage implements Storage {
 
     private final String basePath = "./data";
 
-    private int currentActive = 0;
+    private AtomicLong currentActive = new AtomicLong(0);
 
     private MappedByteBuffer writeMap;
 
     private FileChannel writeChannel;
 
     private FileChannel readChannel;
+
+    private AtomicLong writePosition;
 
     private Map<String,FileChannel> readChannelMap = new ConcurrentHashMap<>();
 
@@ -111,12 +114,12 @@ public class MmapStorage implements Storage {
         try {
             List<String> fileNameList = FileUtils.getFile(basePath);
             if (fileNameList.size() == 0) {
-                currentActive = 1;
+                currentActive.set(0);
             } else {
                 List<Integer> nameInteger = fileNameList.parallelStream().map( file -> {
                     return Integer.valueOf(file.replace(".sst",""));
                 }).collect(Collectors.toList());
-                currentActive = nameInteger.parallelStream().max(Integer::compare).get();
+                currentActive.set(nameInteger.parallelStream().max(Integer::compare).get());
             }
         } catch (Exception e){
             e.printStackTrace();
@@ -165,7 +168,7 @@ public class MmapStorage implements Storage {
     private MappedByteBuffer getWriteAccessFile(){
         try {
             if ( this.writeMap.position() > THRESHOLD){
-                currentActive += 1;
+                currentActive.incrementAndGet();
                 String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
                 File file = new File(activeFileName);
                 if (!file.exists()) {

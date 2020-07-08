@@ -50,11 +50,11 @@ public class AsyncFlushStorage implements Storage {
     private Map<String,byte[]> dataMap = new ConcurrentHashMap<>();
 
     // 读写缓冲区
-    private ByteBuffer buffer = ByteBuffer.allocateDirect(64 * 1024 * 1024);
+    private ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 1024);
 
     private static ExecutorService flushThread = Executors.newSingleThreadExecutor();
 
-    private static ByteBuffer flushBuffer = ByteBuffer.allocateDirect(64 * 1024 * 1024);
+    private static ByteBuffer flushBuffer = ByteBuffer.allocateDirect(1024 * 1024);
 
     private Future<Long> flushFuture;
 

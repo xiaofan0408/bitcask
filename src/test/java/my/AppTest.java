@@ -4,6 +4,7 @@ import static org.junit.Assert.assertTrue;
 
 import my.core.Bitcask;
 import my.storage.impl.AsyncFlushStorage;
+import my.storage.impl.FileChannelStorage;
 import my.storage.impl.MmapStorage;
 import org.junit.Assert;
 import org.junit.Test;
@@ -41,14 +42,14 @@ public class AppTest
 
     @Test
     public void testPut() throws Exception {
-        Bitcask bitcask = Bitcask.builder().storage(new MmapStorage()).build();
+        Bitcask bitcask = Bitcask.builder().storage(new FileChannelStorage()).build();
 //        bitcask.put("hello","hello world");
 //        Assert.assertEquals(bitcask.get("hello"),"hello world");
 //        bitcask.put("hello","hello2");
 //        bitcask.put("hello1","hello11");
 //        Assert.assertEquals(bitcask.get("hello"),"hello2");
 //        Assert.assertEquals(bitcask.get("hello1"),"hello11");
-        byte[] array128 = new byte[1024];
+        byte[] array128 = new byte[1024 * 100];
         String key = "key";
         long start = System.currentTimeMillis();
         for (int i =0; i < 100000;i++){
