@@ -2,6 +2,7 @@ package ben;
 
 import my.core.Bitcask;
 import my.storage.impl.AsyncFlushStorage;
+import my.storage.impl.FileChannelStorage;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -16,7 +17,7 @@ public class BitcaskBenchmark {
 
     private Bitcask bitcask;
 
-    private byte[] array1024 = new byte[128];
+    private byte[] array1024 = new byte[1024];
 
     private  String key = "key";
 
@@ -25,7 +26,7 @@ public class BitcaskBenchmark {
     @Setup
     public void init(){
         bitcask = Bitcask.builder()
-                .storage(new AsyncFlushStorage())
+                .storage(new FileChannelStorage())
                 .build();
     }
 
@@ -44,7 +45,7 @@ public class BitcaskBenchmark {
                 .measurementIterations(2)
                 .mode(Mode.Throughput)
                 .forks(1)
-                .output("./log/bitcask3-128.log")
+                .output("./log/bitcask3-1kb.log")
                 .build();
 
         new Runner(opt).run();

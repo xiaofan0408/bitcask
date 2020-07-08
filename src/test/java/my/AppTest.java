@@ -4,6 +4,7 @@ import static org.junit.Assert.assertTrue;
 
 import my.core.Bitcask;
 import my.storage.impl.AsyncFlushStorage;
+import my.storage.impl.MmapStorage;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -40,7 +41,7 @@ public class AppTest
 
     @Test
     public void testPut() throws Exception {
-        Bitcask bitcask = Bitcask.builder().storage(new AsyncFlushStorage()).build();
+        Bitcask bitcask = Bitcask.builder().storage(new MmapStorage()).build();
 //        bitcask.put("hello","hello world");
 //        Assert.assertEquals(bitcask.get("hello"),"hello world");
 //        bitcask.put("hello","hello2");

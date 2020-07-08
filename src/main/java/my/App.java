@@ -2,6 +2,7 @@ package my;
 
 import my.core.Bitcask;
 import my.storage.impl.AsyncFlushStorage;
+import my.storage.impl.MmapStorage;
 
 /**
  * Hello world!
@@ -10,7 +11,7 @@ import my.storage.impl.AsyncFlushStorage;
 public class App 
 {
     public static void main( String[] args ) throws Exception {
-        Bitcask bitcask = Bitcask.builder().storage(new AsyncFlushStorage()).build();
+        Bitcask bitcask = Bitcask.builder().storage(new MmapStorage()).build();
 //        long start = System.currentTimeMillis();
 //        for (int i =0; i < 30000;i++){
 //            String key = "key"+i;
