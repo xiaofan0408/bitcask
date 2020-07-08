@@ -3,7 +3,7 @@ package my.core;
 import my.entity.Item;
 import my.storage.KeyDir;
 import my.storage.Storage;
-import my.storage.Storage2;
+import my.storage.impl.FileChannelStorage;
 import my.utils.StringUtils;
 
 
@@ -14,11 +14,12 @@ public class Bitcask {
 
     private KeyDir keyDir;
 
-    private Storage storage;
+    public Bitcask(KeyDir keyDir){
+        this.keyDir = keyDir;
+    }
 
-    public Bitcask(){
-        storage = new Storage();
-        keyDir = new KeyDir(storage);
+    public static Builder builder(){
+        return new Builder();
     }
 
     public String get(String key) throws Exception {
@@ -32,6 +33,30 @@ public class Bitcask {
 
     public void put(String key,String value){
       put(key,StringUtils.getStringByte(value));
+    }
+
+    public static class Builder{
+
+        private Storage storage;
+
+        public Builder fileChannelStorage(){
+            this.storage = new FileChannelStorage();
+            return this;
+        }
+
+        public Builder storage(Storage storage){
+            this.storage = storage;
+            return this;
+        }
+
+        public Bitcask build(){
+            if (this.storage == null) {
+                this.storage = new FileChannelStorage();
+            }
+            KeyDir keyDir = new KeyDir(storage);
+            return new Bitcask(keyDir);
+        }
+
     }
 
 }

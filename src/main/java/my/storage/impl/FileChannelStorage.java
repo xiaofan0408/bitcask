@@ -1,7 +1,9 @@
-package my.storage;
+package my.storage.impl;
 
 import my.entity.Index;
 import my.entity.Item;
+import my.storage.KeyDir;
+import my.storage.Storage;
 import my.utils.ByteUtils;
 import my.utils.Crc32;
 import my.utils.FileUtils;
@@ -15,20 +17,13 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
  * @author xuzefan  2019/5/10 14:07
  */
-public class Storage2 {
+public class FileChannelStorage implements Storage {
 
     // 8 + 8 + 4 + 4
     public static int HEADER_SIZE = 24;
@@ -37,7 +32,7 @@ public class Storage2 {
 
     private final String basePath = "./data";
 
-    private AtomicInteger currentActive = new AtomicInteger(0);
+    private int currentActive = 0;
 
     private FileChannel writeChannel;
 
@@ -45,22 +40,12 @@ public class Storage2 {
 
     private Map<String,FileChannel> readChannelMap = new ConcurrentHashMap<>();
 
-    private Map<String,byte[]> dataMap = new ConcurrentHashMap<>();
-
-    // 读写缓冲区
-    private ByteBuffer buffer = ByteBuffer.allocateDirect(64 * 1024 * 1024);
-
-    private static ExecutorService flushThread = Executors.newSingleThreadExecutor();
-
-    private static ByteBuffer flushBuffer = ByteBuffer.allocateDirect(64 * 1024 * 1024);
-
-    private Future<Long> flushFuture;
-
-    public Storage2() {
+    public FileChannelStorage() {
         initCurrentActive();
         initAccessFile();
     }
 
+    @Override
     public void loadData(KeyDir keyDir) {
         try {
             List<File> files = FileUtils.listFile(basePath);
@@ -85,25 +70,49 @@ public class Storage2 {
         }
     }
 
+    @Override
+    public Index ioWrite(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) {
 
-    private long length(ByteBuffer[] vec) {
-        long length = 0;
-        for (int i = 0; i < vec.length; i++) {
-            length += vec[i].remaining();
+        try {
+            FileChannel fileChannel = this.getWriteAccessFile();
+            fileChannel.position(fileChannel.size());
+            long start = fileChannel.position();
+            long length = HEADER_SIZE + key_size + value_size;
+            ByteBuffer byteBuffer = getByteBuffer(ts,key_size,value_size,keyArray,valueArray);
+            writeFully(fileChannel,byteBuffer);
+            String activeFileName = basePath + "/"+ String.format("%s.sst",currentActive);
+            return new Index(activeFileName,start,length);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return length;
+        return null;
+    }
+
+    @Override
+    public Item ioRead(Index info) {
+        FileChannel fileChannel = this.getReadAccessFile(info);
+        try {
+            byte[] byteArray = new byte[(int)info.getLength()];
+            ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray);
+            fileChannel.position(info.getStart());
+            fileChannel.read(byteBuffer);
+            return byteBufferToItem(byteBuffer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     private void initCurrentActive(){
         try {
             List<String> fileNameList = FileUtils.getFile(basePath);
             if (fileNameList.size() == 0) {
-                currentActive.set(1);
+                currentActive = 1;
             } else {
                 List<Integer> nameInteger = fileNameList.parallelStream().map( file -> {
                     return Integer.valueOf(file.replace(".sst",""));
                 }).collect(Collectors.toList());
-                currentActive.set(nameInteger.parallelStream().max(Integer::compare).get());
+                currentActive = nameInteger.parallelStream().max(Integer::compare).get();
             }
         } catch (Exception e){
             e.printStackTrace();
@@ -151,7 +160,7 @@ public class Storage2 {
     private FileChannel getWriteAccessFile(){
         try {
             if ( this.writeChannel.size() > THRESHOLD){
-                currentActive.incrementAndGet();
+                currentActive += 1;
                 String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
                 File file = new File(activeFileName);
                 if (!file.exists()) {
@@ -167,93 +176,9 @@ public class Storage2 {
         return null;
     }
 
-    public Index ioWrite(long ts,int key_size,int value_size,byte[] keyArray,byte[] valueArray){
-        try {
-            FileChannel fileChannel = this.getWriteAccessFile();
-            fileChannel.position(fileChannel.size());
-            long start = fileChannel.position();
-            long length = HEADER_SIZE + key_size + value_size;
-            if (length > buffer.remaining()) {
-                // 落盘
-                flush();
-            }
-            byte[] message = getBytes(ts,key_size,value_size,keyArray,valueArray);
-            buffer.put(message);
-            String indexName = basePath + "/"+ String.format("%s.sst_%d_%d",currentActive,start,length);
-            dataMap.put(indexName,message);
-            return new Index(basePath + "/"+ String.format("%s.sst",currentActive),start,length);
-        }catch (Exception e){}
-        return null;
-    }
-
-    private void flush() {
-        if (flushFuture != null) {
-            try {
-                flushFuture.get();
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-            flushFuture = null;
-        }
-
-        buffer.flip();
-        int remaining = buffer.remaining();
-        final byte[] message = new byte[remaining];
-        buffer.get(message);
-        flushFuture = flushThread.submit(new Callable<Long>() {
-            @Override
-            public Long call() throws Exception {
-                try {
-                    if (flushBuffer.remaining() < message.length) {
-                        FileChannel fileChannel = null;
-                        if (writeChannel.size() + flushBuffer.remaining()> THRESHOLD) {
-                            currentActive.incrementAndGet();
-                            String activeFileName = basePath + "/" + String.format("%s.sst",currentActive);
-                            File file = new File(activeFileName);
-                            if (!file.exists()) {
-                                file.createNewFile();
-                            }
-                            writeChannel = new RandomAccessFile(file,"rw").getChannel();
-                            readChannel = new RandomAccessFile(file,"r").getChannel();
-                        } else {
-                            fileChannel = writeChannel;
-                        }
-                        flushBuffer.flip();
-                        fileChannel.write(flushBuffer);
-                        flushBuffer.clear();
-                        dataMap.clear();
-                    }
-                    flushBuffer.put(message);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                return 0L;
-            }
-        });
-        buffer.clear();
-    }
 
     private long writeFully(FileChannel ch, ByteBuffer vec) throws IOException {
-       return ch.write(vec);
-    }
-
-    public Item ioRead(Index info) {
-        String indexName = info.getActiveFileName() + "_" + info.getStart() + "_" + info.getLength();
-        if (dataMap.get(indexName) != null) {
-            ByteBuffer byteBuffer = ByteBuffer.wrap(dataMap.get(indexName));
-            return byteBufferToItem(byteBuffer);
-        }
-        FileChannel fileChannel = this.getReadAccessFile(info);
-        try {
-            byte[] byteArray = new byte[(int)info.getLength()];
-            ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray);
-            fileChannel.position(info.getStart());
-            fileChannel.read(byteBuffer);
-            return byteBufferToItem(byteBuffer);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
+        return ch.write(vec);
     }
 
     private Item byteBufferToItem(ByteBuffer byteBuffer) {
@@ -267,22 +192,6 @@ public class Storage2 {
         byteBuffer.get(keyArray);
         byteBuffer.get(valueArray);
         return getItem(crc32,ts,key_size,value_size,keyArray,valueArray);
-    }
-
-    private byte[] getBytes(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) throws IOException {
-        byte[] data = new byte[HEADER_SIZE];
-        ByteBuffer h = ByteBuffer.wrap(data);
-        h.putLong(8,ts);
-        h.putInt(16,key_size);
-        h.putInt(20,value_size);
-        Crc32 crc = new Crc32();
-        crc.update(data, 8, 16);
-        crc.update(keyArray);
-        crc.update(valueArray);
-        long crc32 = crc.getValue();
-        h.putLong(0,crc32);
-        byte[] result = ByteUtils.concat(data,keyArray,valueArray);
-        return result;
     }
 
     private ByteBuffer getByteBuffer(long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) throws IOException {
@@ -320,17 +229,10 @@ public class Storage2 {
         channel.position(end);
     }
 
-    private Item getItem(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray){
-        String key = new String(keyArray,Charset.forName("utf-8"));
-        String value = new String(valueArray,Charset.forName("utf-8"));
-        return new Item(crc32,ts,key_size,value_size,key,value);
-    }
-
-    public static byte[] copyOf(byte[] original, int newLength) {
-        byte[] copy = new byte[newLength];
-        System.arraycopy(original, 0, copy, 0,
-                Math.min(original.length, newLength));
-        return copy;
+    private Item getItem(long crc32, long ts, int key_size, int value_size, byte[] keyArray, byte[] valueArray) {
+        String key = new String(keyArray, Charset.forName("utf-8"));
+        String value = new String(valueArray, Charset.forName("utf-8"));
+        return new Item(crc32, ts, key_size, value_size, key, value);
     }
 
 }

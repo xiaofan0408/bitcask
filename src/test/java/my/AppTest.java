@@ -3,6 +3,7 @@ package my;
 import static org.junit.Assert.assertTrue;
 
 import my.core.Bitcask;
+import my.storage.impl.AsyncFlushStorage;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -22,7 +23,7 @@ public class AppTest
 
     @Test
     public void testGetAndPut() throws Exception {
-        Bitcask bitcask = new Bitcask();
+        Bitcask bitcask = Bitcask.builder().fileChannelStorage().build();
 //        bitcask.put("hello","hello world");
 //        Assert.assertEquals(bitcask.get("hello"),"hello world");
 //        bitcask.put("hello","hello2");
@@ -39,7 +40,7 @@ public class AppTest
 
     @Test
     public void testPut() throws Exception {
-        Bitcask bitcask = new Bitcask();
+        Bitcask bitcask = Bitcask.builder().storage(new AsyncFlushStorage()).build();
 //        bitcask.put("hello","hello world");
 //        Assert.assertEquals(bitcask.get("hello"),"hello world");
 //        bitcask.put("hello","hello2");
@@ -58,7 +59,7 @@ public class AppTest
 
     @Test
     public void testStart() throws Exception {
-        Bitcask bitcask = new Bitcask();
+        Bitcask bitcask = Bitcask.builder().fileChannelStorage().build();
         for (int i =0; i < 30000;i++){
             String key = "key"+i;
             String value = "value"+i;
