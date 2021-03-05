@@ -49,7 +49,7 @@ public class AppTest
 //        bitcask.put("hello1","hello11");
 //        Assert.assertEquals(bitcask.get("hello"),"hello2");
 //        Assert.assertEquals(bitcask.get("hello1"),"hello11");
-        byte[] array128 = new byte[1024 * 100];
+        byte[] array128 = new byte[128];
         String key = "key";
         long start = System.currentTimeMillis();
         for (int i =0; i < 100000;i++){
@@ -67,5 +67,18 @@ public class AppTest
             String value = "value"+i;
             Assert.assertEquals(bitcask.get(key),value);
         }
+    }
+
+
+    @Test
+    public void testPutAsync() throws Exception {
+        Bitcask bitcask = Bitcask.builder().storage(new FileChannelStorage()).build();
+        byte[] array128 = new byte[128];
+        String key = "key";
+        long start = System.currentTimeMillis();
+        for (int i =0; i < 100000;i++){
+            bitcask.putAsync(key,array128);
+        }
+        System.out.println(System.currentTimeMillis() - start);
     }
 }

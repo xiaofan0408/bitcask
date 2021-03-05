@@ -35,6 +35,10 @@ public class Bitcask {
       put(key,StringUtils.getStringByte(value));
     }
 
+    public void putAsync(String key,byte[] values) {
+        keyDir.putAsync(key,values);
+    }
+
     public static class Builder{
 
         private Storage storage;

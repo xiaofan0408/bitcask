@@ -5,6 +5,8 @@ import my.entity.Item;
 import my.utils.StringUtils;
 
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -16,9 +18,18 @@ public class KeyDir {
 
     private Storage storage;
 
+    private BlockingQueue<ItemEvent> blockingQueue;
+
+    private int DEFAULT_QUEUE_SIZE= 1024;
+
+    private Worker worker;
+
     public KeyDir(Storage storage) {
         this.storage = storage;
         this.reloadIndex();
+        this.blockingQueue = new ArrayBlockingQueue<>(DEFAULT_QUEUE_SIZE);
+        worker = new Worker(blockingQueue,storage,this);
+        worker.start();
     }
 
     public Item get(String key) throws Exception{
@@ -48,4 +59,34 @@ public class KeyDir {
         this.storage.loadData(this);
     }
 
+    public void putAsync(String key, byte[] values) {
+        byte[] keyArray = StringUtils.getStringByte(key);
+        byte[] valueArray = values;
+        int key_size = keyArray.length;
+        int value_size = valueArray.length;
+        long ts = System.currentTimeMillis();
+        ItemEvent itemEvent = new ItemEvent();
+        itemEvent.setKey(key);
+        itemEvent.setKeyArray(keyArray);
+        itemEvent.setValueArray(valueArray);
+        itemEvent.setKeySize(key_size);
+        itemEvent.setValueSize(value_size);
+        itemEvent.setTs(ts);
+
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    blockingQueue.put(itemEvent);
+                    break;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
 }

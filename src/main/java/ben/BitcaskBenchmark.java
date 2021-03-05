@@ -32,7 +32,7 @@ public class BitcaskBenchmark {
 
     @Benchmark
     public void testSet10kb(){
-        bitcask.put(key,array1024);
+        bitcask.putAsync(key,array1024);
     }
 
     public static void main(String[] args) throws RunnerException {
@@ -45,7 +45,8 @@ public class BitcaskBenchmark {
                 .measurementIterations(2)
                 .mode(Mode.Throughput)
                 .forks(1)
-                .output("./log/bitcask3-128.log")
+                .threads(8)
+                .output("./log/bitcask4-128.log")
                 .build();
 
         new Runner(opt).run();
