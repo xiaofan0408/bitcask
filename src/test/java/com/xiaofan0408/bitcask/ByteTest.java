@@ -1,8 +1,8 @@
 package com.xiaofan0408.bitcask;
 
 
-import com.xiaofan0408.bitcask.common.my.utils.ByteUtils;
-import com.xiaofan0408.bitcask.common.my.utils.Crc32;
+import com.xiaofan0408.bitcask.v1.common.my.utils.ByteUtils;
+import com.xiaofan0408.bitcask.v1.common.my.utils.Crc32;
 import org.junit.Test;
 
 import java.io.IOException;

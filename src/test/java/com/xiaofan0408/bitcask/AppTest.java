@@ -3,8 +3,8 @@ package com.xiaofan0408.bitcask;
 
 
 
-import com.xiaofan0408.bitcask.common.my.core.Bitcask;
-import com.xiaofan0408.bitcask.common.my.storage.impl.FileChannelStorage;
+import com.xiaofan0408.bitcask.v1.common.my.core.Bitcask;
+import com.xiaofan0408.bitcask.v1.common.my.storage.impl.FileChannelStorage;
 import org.junit.Assert;
 import org.junit.Test;
 
